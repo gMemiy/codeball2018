@@ -18,7 +18,7 @@ public final class MyStrategy implements Strategy {
         
         boolean jump = DistBetweenPoint(new Point(ball), new Point(me)) <
                 (rules.BALL_RADIUS + rules.ROBOT_MAX_RADIUS) &&
-                (ball.y - ball.radius) <= (rules.ROBOT_MAX_RADIUS*2.0) &&
+                (ball.y - ball.radius) <= (rules.ROBOT_MAX_RADIUS*4.0) &&
                 me.y < ball.y && 
                 me.z < ball.z;
         
@@ -45,15 +45,39 @@ public final class MyStrategy implements Strategy {
                 // Если мяч не вылетит за пределы арены
                 // (произойдет столкновение со стеной, которое мы не рассматриваем),
                 // и при этом мяч будет находится ближе к вражеским воротам, чем робот,
+                if (is_attacker)
+                {
+                    ball_pos.x += 2*ball.radius*(ball.x/(rules.arena.width/2.0));
+                    /*if (ball_pos.x > rules.arena.width/2.0)
+                    {
+                        ball_pos.x = rules.arena.width/2.0;
+                    }
+                    if (ball_pos.x < -rules.arena.width/2.0)
+                    {
+                        ball_pos.x = -rules.arena.width/2.0;
+                    }*/
+                }
                 if (ball_pos.z > me.z)
                     //&& Math.abs(ball.x) < (rules.arena.width / 2.0)
                     //&& Math.abs(ball.z) < (rules.arena.depth / 2.0))
-                {
+                {                   
                     // Посчитаем, с какой скоростью робот должен бежать,
                     // Чтобы прийти туда же, где будет мяч, в то же самое время
                     double delta_pos_x = ball_pos.x - me.x;
                     double delta_pos_z = ball_pos.z - me.z;
                     double delta_pos_dist = Math.sqrt(delta_pos_x*delta_pos_x + delta_pos_z*delta_pos_z);
+                    
+                    if (is_attacker && ball.z < (-rules.arena.depth / 4.0))
+                    {
+                        Point nearest = NearestEnemy(new Point(me), game.robots);
+                        if (nearest != null)
+                        {
+                            double distToEnemy = DistBetweenPoint(new Point(me), nearest);
+                            delta_pos_dist = distToEnemy;
+                            delta_pos_x = nearest.x - me.x;
+                            delta_pos_z = nearest.z - me.z;
+                        }
+                    }
                     double need_speed = delta_pos_dist / t;
                     // Если эта скорость лежит в допустимом отрезке
                     if (0.5 * rules.ROBOT_MAX_GROUND_SPEED < need_speed
@@ -73,17 +97,22 @@ public final class MyStrategy implements Strategy {
         // Стратегия защитника (или атакующего, не нашедшего хорошего момента для удара):
         // Будем стоять посередине наших ворот
         double target_pos_x = ball.x;
+        
         if (target_pos_x > rules.arena.goal_width / 2)
         {
             target_pos_x = rules.arena.goal_width / 2;
         }
-        
+
         if (target_pos_x < -rules.arena.goal_width / 2)
         {
             target_pos_x =  -rules.arena.goal_width / 2;
         }
         
         double target_pos_z = -(rules.arena.depth / 2.0) + rules.arena.bottom_radius - rules.ROBOT_MIN_RADIUS;
+        if (is_attacker)
+        {
+            target_pos_z = -rules.arena.depth / 4.0;
+        }
         // Причем, если мяч движется в сторону наших ворот
         if (ball.velocity_z < -EPS) {
             // Найдем время и место, в котором мяч пересечет линию ворот
@@ -107,6 +136,25 @@ public final class MyStrategy implements Strategy {
         action.use_nitro = false;
     }
     
+    private static Point NearestEnemy(Point p, Robot[] robots)
+    {
+        double shortest = 0;
+        Point nearest = null;
+        for (Robot r : robots)
+        {
+            if (!r.is_teammate)
+            {
+                Point rp = new Point (r);
+                double d = DistBetweenPoint(p, rp);
+                if (shortest == 0 || Math.abs(d) < shortest )
+                {
+                    shortest = Math.abs(d);
+                    nearest = rp;
+                }
+            }
+        }
+        return nearest;
+    }
     
     private static double DistBetweenPoint(Point p1, Point p2)
     {
