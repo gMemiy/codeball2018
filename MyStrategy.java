@@ -167,15 +167,231 @@ public final class MyStrategy implements Strategy {
         }
         return min;
     }
+    private static Point Div(Point p1, double c)
+    {
+        return new Point (p1.x/c, p1.y/c, p1.z/c);
+    }
+    private static double Lenght(Point p)
+    {
+        return Math.sqrt(p.x*p.x + p.y*p.y + p.z*p.z);
+    }
+    private static Point Normalize(Point p)
+    {
+        double l = Lenght(p);
+        return Div(p, l);
+    }
+
+    private static Dan DanToSphereInner(Point p, Point sphere_center, double r)
+    {
+        Dan d = new Dan();
+        d.dot = r - Lenght(Sub(p, sphere_center));
+        d.normal = Normalize(Sub(p, sphere_center));
+        return d;
+    }
+
+    private static Dan DanToSphereOuter(Point p, Point sphere_center, double r)
+    {
+        Dan d = new Dan();
+        d.dot = Lenght(Sub(p, sphere_center)) - r;
+        d.normal = Normalize(Sub(p, sphere_center));
+        return d;
+    }
+
+    private static double Clamp (double x, double l, double u)
+    {
+        return Math.min(u, Math.max(x, l));
+    }
     
     private static Dan DanToArenaQuarter(Point p, Arena arena)
     {
         Dan dan = DanToPlane(p, new Point(0, 0, 0), new Point(0, 1, 0));
         dan = MinDan(dan, DanToPlane(p, new Point(0, arena.height, 0), new Point(0, -1, 0))); // celling
         dan = MinDan(dan, DanToPlane(p, new Point(arena.width/2, 0, 0), new Point(-1, 0, 0))); // x side
-        dan = MinDan(dan, DanToPlane(p, new Point(-arena.width/2, 0, 0), new Point(1, 0, 0))); // x side 2
-        dan = MinDan(dan, DanToPlane(p, new Point(0, 0, arena.depth / 2), new Point(0, 0, -1))); // z side
-        dan = MinDan(dan, DanToPlane(p, new Point(0, 0, -arena.depth / 2), new Point(0, 0, 1))); // z side 2
+        dan = MinDan(dan, DanToPlane(p, new Point(0, 0, (arena.depth / 2)+ arena.goal_depth), new Point(0, 0, -1))); // z side goal
+
+        /*dan = MinDan(dan, DanToPlane(p, new Point(-arena.width/2, 0, 0), new Point(1, 0, 0))); // x side 2        
+        dan = MinDan(dan, DanToPlane(p, new Point(0, 0, -arena.depth / 2), new Point(0, 0, 1))); // z side 2*/
+
+        double vx = p.x - (arena.goal_width / 2) - arena.goal_top_radius;
+        double vy = p.y - arena.goal_height - arena.goal_top_radius;
+
+        // side z
+        if (p.x >= (arena.goal_width / 2) + arena.goal_side_radius ||
+            p.y >= arena.goal_height + arena.goal_side_radius ||
+            (vx > 0 && vy > 0 && 
+                Math.sqrt(vx*vx + vy*vy) >= arena.goal_top_radius + arena.goal_side_radius))
+        {
+            dan = MinDan(dan, DanToPlane(p, new Point(0, 0, arena.depth / 2), new Point(0, 0, -1)));
+        }
+
+        // size x & celling (goal)
+        if (p.z >= (arena.depth / 2) + arena.goal_side_radius)
+        {
+            // x
+            dan = MinDan(dan, DanToPlane(p, new Point(arena.goal_width / 2, 0, 0), new Point(-1, 0, 0)));
+            // y
+            dan = MinDan(dan, DanToPlane(p, new Point(0, arena.goal_height, 0), new Point(0, -1, 0)));
+        }
+
+        // Goal back corners
+        if (p.z > (arena.depth / 2) + arena.goal_depth - arena.bottom_radius)
+        {
+            dan = MinDan(dan, DanToSphereInner(p,
+                    new Point(
+                        Clamp(p.x, arena.bottom_radius - (arena.goal_width / 2),(arena.goal_width / 2) - arena.bottom_radius),
+                        Clamp(p.y, arena.bottom_radius, arena.goal_height - arena.goal_top_radius),
+                            (arena.depth / 2) + arena.goal_depth - arena.bottom_radius),
+                        arena.bottom_radius));
+        }
+
+        // Corner
+        if (p.x > (arena.width / 2) - arena.corner_radius &&
+            p.z > (arena.depth / 2) - arena.corner_radius)
+        {
+            dan = MinDan(dan, DanToSphereInner(
+                p,
+                new Point(
+                    (arena.width / 2) - arena.corner_radius,
+                    p.y,
+                    (arena.depth / 2) - arena.corner_radius),
+                arena.corner_radius));
+        }
+
+        // Goal outer corner
+        if (p.z < (arena.depth / 2) + arena.goal_side_radius)
+        {
+            // Side x
+            if (p.x < (arena.goal_width / 2) + arena.goal_side_radius)
+            {
+                dan = MinDan(dan, DanToSphereOuter(
+                    p,
+                    new Point(
+                        (arena.goal_width / 2) + arena.goal_side_radius,
+                        p.y,
+                        (arena.depth / 2) + arena.goal_side_radius),
+                    arena.goal_side_radius));
+            }
+            // Ceiling
+            if (p.y < arena.goal_height + arena.goal_side_radius)
+            {
+                dan = MinDan(dan, DanToSphereOuter(
+                    p,
+                    new Point(
+                        p.x,
+                        arena.goal_height + arena.goal_side_radius,
+                        (arena.depth / 2) + arena.goal_side_radius),
+                    arena.goal_side_radius));
+            }
+            // Top corner
+            double ox = (arena.goal_width / 2) - arena.goal_top_radius;
+            double oy = arena.goal_height - arena.goal_top_radius;
+            vx = p.x - ox;
+            vy = p.y - oy;
+            if (vx > 0 && vy > 0)
+            {
+                double lv = Math.sqrt(vx*vx + vy*vy);
+                ox = ox + (vx / lv) * (arena.goal_top_radius + arena.goal_side_radius);
+                oy = oy + (vy / lv) * (arena.goal_top_radius + arena.goal_side_radius);
+                dan = MinDan(dan, DanToSphereOuter(
+                    p,
+                    new Point(ox, oy, (arena.depth / 2) + arena.goal_side_radius),
+                    arena.goal_side_radius));
+            }
+
+            // Goal inside top corners skipped
+            // Bottom corners
+            if (p.y < arena.bottom_radius)
+            {
+                // Side x
+                if (p.x > (arena.width / 2) - arena.bottom_radius)
+                {
+                    dan = MinDan(dan, DanToSphereInner(
+                        p,
+                        new Point(
+                            (arena.width / 2) - arena.bottom_radius,
+                            arena.bottom_radius,
+                            p.z),
+                        arena.bottom_radius));
+                }
+                // Side z
+                if (p.z > (arena.depth / 2) - arena.bottom_radius
+                    && p.x >= (arena.goal_width / 2) + arena.goal_side_radius)
+                {
+                    dan = MinDan(dan, DanToSphereInner(
+                        p,
+                        new Point(
+                            p.x,
+                            arena.bottom_radius,
+                            (arena.depth / 2) - arena.bottom_radius),
+                        arena.bottom_radius));
+                }
+                // Side z (goal)
+                if (p.z > (arena.depth / 2) + arena.goal_depth - arena.bottom_radius)
+                {
+                    dan = MinDan(dan, DanToSphereInner(
+                        p,
+                        new Point(
+                            p.x,
+                            arena.bottom_radius,
+                            (arena.depth / 2) + arena.goal_depth - arena.bottom_radius),
+                        arena.bottom_radius));
+                }
+                // Goal outer corner
+                ox = (arena.goal_width / 2) + arena.goal_side_radius;
+                oy = (arena.depth / 2) + arena.goal_side_radius;
+                vx = p.x - ox;
+                vy = p.z - oy;
+                double vl = Math.sqrt(vx*vx + vy*vy);
+                if (vx < 0 && vy < 0
+                    && vl < arena.goal_side_radius + arena.bottom_radius)
+                {
+
+                    ox = ox + vx / vl * (arena.goal_side_radius + arena.bottom_radius);
+                    oy = oy + vy / vl * (arena.goal_side_radius + arena.bottom_radius);
+                    dan = MinDan(dan, DanToSphereInner(
+                        p,
+                        new Point(ox, arena.bottom_radius, oy),
+                        arena.bottom_radius));
+                }
+                // Side x (goal)
+                if (p.z >= (arena.depth / 2) + arena.goal_side_radius
+                    && p.x > (arena.goal_width / 2) - arena.bottom_radius)
+                {
+                    dan = MinDan(dan, DanToSphereInner(
+                        p,
+                        new Point(
+                            (arena.goal_width / 2) - arena.bottom_radius,
+                            arena.bottom_radius,
+                            p.z),
+                        arena.bottom_radius));
+                }
+                // Corner
+                if (p.x > (arena.width / 2) - arena.corner_radius
+                    && p.z > (arena.depth / 2) - arena.corner_radius)
+                {
+                    double cox = (arena.width / 2) - arena.corner_radius;
+                    double coy = (arena.depth / 2) - arena.corner_radius;
+
+                    double nx = p.x - cox;
+                    double ny = p.z - coy;
+                    double dist = Math.sqrt(nx*nx + ny*ny);
+                    if (dist > arena.corner_radius - arena.bottom_radius)
+                    {
+                        nx = nx / dist;
+                        ny = ny / dist;
+
+                        ox = cox + nx * (arena.corner_radius - arena.bottom_radius);
+                        oy = coy + ny * (arena.corner_radius - arena.bottom_radius);
+                        dan = MinDan(dan, DanToSphereInner(
+                            p,
+                            new Point(ox, arena.bottom_radius, oy),
+                            arena.bottom_radius));
+                    }
+                }
+
+                // Ceiling corners
+            }
+        }
         
         return dan;
     }
