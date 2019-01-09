@@ -42,20 +42,16 @@ public final class MyStrategy implements Strategy {
             {
                 double t = i * 0.1;
                 Ball ball_pos = CalcNewBallPos(ball, t, rules);
+                for (Robot r : game.robots)
+                {
+                    CollideRobots(ball_pos, r, rules);
+                }
                 // Если мяч не вылетит за пределы арены
                 // (произойдет столкновение со стеной, которое мы не рассматриваем),
                 // и при этом мяч будет находится ближе к вражеским воротам, чем робот,
                 if (is_attacker)
                 {
                     ball_pos.x += 2*ball.radius*(ball.x/(rules.arena.width/2.0));
-                    /*if (ball_pos.x > rules.arena.width/2.0)
-                    {
-                        ball_pos.x = rules.arena.width/2.0;
-                    }
-                    if (ball_pos.x < -rules.arena.width/2.0)
-                    {
-                        ball_pos.x = -rules.arena.width/2.0;
-                    }*/
                 }
                 if (ball_pos.z > me.z)
                     //&& Math.abs(ball.x) < (rules.arena.width / 2.0)
@@ -499,6 +495,25 @@ public final class MyStrategy implements Strategy {
             }
         }     
         return b;
+    }
+    
+    static private void CollideRobots(Ball b, Robot r, Rules rules)
+    {
+        Point delta_position = Sub(new Point(b), new Point(r));
+        double  distance = Lenght(delta_position);
+        double penetration = b.radius + r.radius - distance;
+        if (penetration > 0)
+        {           
+            double k_r = (1 / rules.ROBOT_MASS) / ((1 / rules.ROBOT_MASS) + (1 / rules.BALL_MASS));
+            double k_b = (1 / rules.BALL_MASS) / ((1 / rules.ROBOT_MASS) + (1 / rules.BALL_MASS));
+            Point normal = Normalize(delta_position);
+            Point b_position = Sub(new Point(b), Mult(normal, penetration * k_b));
+            Point r_position = Add(new Point(r), Mult(normal, penetration * k_b));
+            
+            b.x = b_position.x;
+            b.y = b_position.y;
+            b.z = b_position.z;
+        }
     }
     
     @Override
