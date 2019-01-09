@@ -10,9 +10,6 @@ public final class MyStrategy implements Strategy {
         {
             id = -1;
         }
-        
-        cout << id;
-        
         if (!me.touch)
         {
             action.target_velocity_x = 0.0;
