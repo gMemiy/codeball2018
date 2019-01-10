@@ -29,8 +29,7 @@ public final class MyStrategy implements Strategy {
             }
         }
         
-        if (is_attacker &&
-                ball.z > me.z)
+        if (is_attacker)
         {
             for (int i = 0; i < 100; ++i)
             {
@@ -48,47 +47,59 @@ public final class MyStrategy implements Strategy {
                 {
                     ball_pos.x += ball.radius*(ball_pos.x/(rules.arena.width/2.0)) + ball.radius*(ball_pos.z/(rules.arena.depth/2.0));
                 }
-                if (ball_pos.z > me.z)
-                {                   
-                    double delta_pos_x = ball_pos.x - me.x;
-                    double delta_pos_y = ball_pos.y + ball.radius/2 - me.y;
+                //if (ball_pos.z > me.z)
+                {   
+                    Point aim = new Point(0, me.y, rules.arena.depth);
                     
-                    double addZ = 0;
-                    if (ball.velocity_y > EPS && delta_pos_y > rules.ROBOT_MAX_JUMP_SPEED*t)
+                    Point vec = Normalize(Sub(aim, new Point(ball_pos)));
+                    Point myVec = Normalize(Sub(new Point(ball_pos), new Point(me)));
+                    
+                    Point dPos = Sub(Sub(new Point(ball_pos), new Point(me)), Mult(vec, ball.radius*4));
+                    
+                    if ( 
+                            ball_pos.z - me.z > ball.radius * 2 &&
+                            //Math.abs(vec.x/myVec.x)/(vec.x/myVec.x) !=
+                            //Math.abs(vec.z/myVec.z)/(vec.z/myVec.z)
+                            Lenght(Sub(vec, myVec)) <= .5 || Lenght(Sub(myVec, vec)) <= .5
+                            
+                            //myVec.x / Math.abs(myVec.x) == vec.x / Math.abs(vec.x) &&
+                            //myVec.z / Math.abs(myVec.z) == vec.z / Math.abs(vec.z)
+                            )
                     {
-                        //addZ = -delta_pos_y/2;
+                        attack = true;                        
                     }
-                    double delta_pos_z = ball_pos.z - me.z + addZ;
                     
-                    double delta_pos_dist = Math.sqrt(
-                            Math.sqrt(delta_pos_x*delta_pos_x + delta_pos_z*delta_pos_z)*
-                            Math.sqrt(delta_pos_x*delta_pos_x + delta_pos_z*delta_pos_z)+
-                            delta_pos_y*delta_pos_y
-                    );
-                                       
-                    double jump_speed = delta_pos_y / t;
+                    if (ball_pos.z < me.z)
+                    {
+                        attack = false;
+                    }
+                    
+                    if (attack)
+                    {
+                        dPos = Sub(new Point(ball_pos), new Point(me));
+                    }
+                    
+                    double dist = Lenght(dPos);
+                    
+                    Point v = Mult(Normalize(dPos), rules.ROBOT_MAX_GROUND_SPEED);
+                    
+                    double jt = dPos.y / rules.ROBOT_MAX_JUMP_SPEED;
+                    double jump_speed = dPos.y / jt;
                     double target_jump_speed = 0;
                     if (0.5*rules.ROBOT_MAX_JUMP_SPEED <= jump_speed &&
                             jump_speed <= rules.ROBOT_MAX_JUMP_SPEED &&
-                            delta_pos_dist <= delta_pos_y*2)//rules.ROBOT_MAX_JUMP_SPEED*t)
+                            dist <= dPos.y*2)//rules.ROBOT_MAX_JUMP_SPEED*t)
                     {
                         target_jump_speed = jump_speed;
                     }
                     
-                    double need_speed = delta_pos_dist / t;
+                    //double need_speed = delta_pos_dist / t;
                     // Если эта скорость лежит в допустимом отрезке
-                    if (0.5 * rules.ROBOT_MAX_GROUND_SPEED < need_speed
-                        && need_speed < rules.ROBOT_MAX_GROUND_SPEED)
+                    //if (0.5 * rules.ROBOT_MAX_GROUND_SPEED < need_speed
+                        //&& need_speed < rules.ROBOT_MAX_GROUND_SPEED)
                     {
-                        Point v = new Point(delta_pos_x / delta_pos_dist, 0, delta_pos_z / delta_pos_dist);
-                        if (target_jump_speed > 0)
-                        {
-                            v = Mult(v, rules.ROBOT_MAX_GROUND_SPEED);
-                        }
-                        else
-                        {
-                            v = Mult(v, need_speed);
-                        }
+                        //Point v = new Point(delta_pos_x / delta_pos_dist, 0, delta_pos_z / delta_pos_dist);
+                        
                         // То это и будет наше текущее действие
                         action.target_velocity_x = v.x;//delta_pos_x / delta_pos_dist * need_speed;
                         action.target_velocity_z = v.z;//delta_pos_z / delta_pos_dist * need_speed;
@@ -103,7 +114,7 @@ public final class MyStrategy implements Strategy {
 
         double target_pos_x = (ball.x / (rules.arena.width / 2))*(rules.arena.goal_width / 2 + ball.radius);
         
-        double target_pos_z = -(rules.arena.depth / 2.0) - rules.arena.bottom_radius;
+        double target_pos_z = -(rules.arena.depth / 2.0) - rules.arena.goal_depth + rules.arena.goal_top_radius;
         if (is_attacker)
         {
             target_pos_z = -rules.arena.depth/3;
@@ -535,6 +546,7 @@ public final class MyStrategy implements Strategy {
         return "";
     }
     private double EPS = 1e-5;
+    private boolean attack = true;
 }
 
 final class Point
